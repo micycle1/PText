@@ -1,4 +1,4 @@
-package vectorText;
+package pText;
 
 import processing.core.PApplet;
 import processing.core.PFont;
@@ -15,9 +15,10 @@ import java.util.ArrayList;
  * @author micycle1
  *
  */
-public class VectorText extends PShape {
+public class PText extends PShape {
 
 	// TODO max width, if letter.x > width, new line (offset y too)
+	// TODO return this, for method chaining
 
 	public float scaleX = 1;
 	public float scaleY = 1;
@@ -32,7 +33,8 @@ public class VectorText extends PShape {
 
 	private ArrayList<Float> charDescent = new ArrayList<Float>();
 
-	private float descent = 0;
+	private float descent = 0; // descent for this specific string
+	private float ascent = 0; // ascent for this specific string
 
 	/**
 	 * Using a specific font
@@ -40,9 +42,14 @@ public class VectorText extends PShape {
 	 * @param p
 	 * @param font
 	 */
-	public VectorText(PApplet p, PFont font) {
+	public PText(PApplet p, PFont font) {
 		super(p.getGraphics(), GROUP);
-		this.font = font;
+		if (font == null) {
+			font = p.createFont("Arial", 64, true);
+			System.err.println("ERROR: Null PFont. Defaulting to Arial, 64 pt.");
+		} else {
+			this.font = font;
+		}
 		this.p = p;
 		setStrokeWeight(0); // no stroke by default
 	}
@@ -52,13 +59,12 @@ public class VectorText extends PShape {
 	 * 
 	 * @param p
 	 */
-	public VectorText(PApplet p) {
+	public PText(PApplet p) {
 		this(p, p.getGraphics().textFont);
-		if (font == null) {
-			font = p.createFont("Arial", 64, true);
-		}
-		this.p = p;
-		setStrokeWeight(0); // no stroke by default
+	}
+
+	public PText(PApplet p, String fontName, int size) {
+		this(p, p.createFont(fontName, size, true));
 	}
 
 	/**
@@ -116,7 +122,8 @@ public class VectorText extends PShape {
 	}
 
 	/**
-	 * Set the height of text (precisely, the height of the bounding box)
+	 * Set the width of text (more precisely, the width of the bounding box) (the
+	 * left and right whitespace is not counted)
 	 * 
 	 * @param width
 	 */
@@ -125,6 +132,11 @@ public class VectorText extends PShape {
 		scale(factor, 1);
 	}
 
+	/**
+	 * Set the height of text (more precisely, the height of the bounding box)
+	 * 
+	 * @param height
+	 */
 	public void setTextHeight(float height) {
 		final float factor = height / this.height;
 		scale(1, factor);
@@ -137,7 +149,7 @@ public class VectorText extends PShape {
 	 */
 	public void setFont(PFont font) {
 		this.font = font;
-		setText(text);
+		setText(text); // recreate text
 	}
 
 	/**
@@ -146,7 +158,7 @@ public class VectorText extends PShape {
 	 */
 	public void setFont(String font, int defaultSize) {
 		this.font = p.createFont(font, defaultSize, true);
-		setText(text);
+		setText(text); // recreate text
 	}
 
 	public void scaleHeight(float scaleY) {
@@ -155,6 +167,14 @@ public class VectorText extends PShape {
 
 	public void scaleWidth(float scaleX) {
 		setScale(scaleX, 1);
+	}
+
+	public void setHeightScale(float scale) {
+		// TODO
+	}
+
+	public void setWidthScale(float scale) {
+		// TODO
 	}
 
 	public String getText() {
@@ -209,6 +229,7 @@ public class VectorText extends PShape {
 
 		height = getHeight(this);
 		descent = getMaxY(this);
+		ascent = PApplet.abs(getMinY(this));
 	}
 
 	/**
@@ -220,11 +241,13 @@ public class VectorText extends PShape {
 	 * @param posY
 	 */
 	public void debug(float posX, float posY) {
-		
+
 		float translationX = 0;
 
 		p.pushStyle(); // save existing style
 		
+		p.noFill();
+
 		/**
 		 * Draw string bounding box (excludes whitespace)
 		 */
@@ -232,7 +255,6 @@ public class VectorText extends PShape {
 		p.strokeWeight(4);
 		p.rect(posX, posY + descent * scaleY, width, -height);
 
-		
 		/**
 		 * Draw per-character bounding boxes (includes per-char whitespace)
 		 */
@@ -245,12 +267,12 @@ public class VectorText extends PShape {
 					-charHeight(c));
 			translationX += charWidth(c);
 		}
-		
+
 		/**
 		 * Draw baseline
 		 */
 		p.strokeWeight(4);
-		p.stroke(200, 50,200);
+		p.stroke(200, 50, 200);
 		p.line(posX, posY, posX + width, posY);
 
 		/**
@@ -333,6 +355,33 @@ public class VectorText extends PShape {
 	public float getTextHeight() {
 		return height;
 	}
+	
+	/**
+	 * Returns the descent (the maximum height of any character below the baseline)
+	 * of the current text
+	 * 
+	 * @return
+	 */
+	public float getTextDescent() {
+//		float maxDescent = Float.NEGATIVE_INFINITY;
+//		for (float charDescent : charDescent) {
+//			maxDescent = Math.max(maxDescent, charDescent);
+//		}
+//		return maxDescent * scaleY;
+		return descent * scaleY;
+	}
+
+	/**
+	 * Returns the ascent (the maximum height of any character above the baseline)
+	 * of the current text
+	 * 
+	 * @return
+	 */
+	public float getTextAscent() {
+		// alternatively iterate over string, calling charHeight(char), and calc the max
+		// charheight
+		return ascent * scaleY;
+	}
 
 	/**
 	 * Gets the whitespace
@@ -413,6 +462,13 @@ public class VectorText extends PShape {
 		return temp.get();
 	}
 
+	/**
+	 * Return value of smallest (up-most) Y coordinate from shape (may return
+	 * negative values)
+	 * 
+	 * @param shape
+	 * @return
+	 */
 	private static float getMinY(PShape shape) {
 		float min = Float.MAX_VALUE;
 		if (shape.getFamily() == GROUP) {
