@@ -6,30 +6,27 @@ import processing.core.PGraphics;
 import processing.core.PImage;
 import processing.core.PShape;
 
-import static processing.core.PApplet.abs;
-
 import java.util.ArrayList;
 
 /**
- * Vectorised text. A middleman PFonts and PShapes.
- * 
- * TODO max width, if letter.x > width, new line (offset y too)
+ * Vectorised text for Processing. A middleman between PFonts and PShapes. Eases
+ * working with text.
  * 
  * @author micycle1
  *
  */
 public class VectorText extends PShape {
 
-	float scaleX = 1;
-	float scaleY = 1;
+	// TODO max width, if letter.x > width, new line (offset y too)
 
-	float width, height;
+	public float scaleX = 1;
+	public float scaleY = 1;
+
+	public float width, height;
 
 	private PApplet p;
 
 	private PFont font;
-
-	private int fontSize; // declare separate in case font is changed?
 
 	private String text;
 
@@ -47,6 +44,7 @@ public class VectorText extends PShape {
 		super(p.getGraphics(), GROUP);
 		this.font = font;
 		this.p = p;
+		setStrokeWeight(0); // no stroke by default
 	}
 
 	/**
@@ -60,20 +58,31 @@ public class VectorText extends PShape {
 			font = p.createFont("Arial", 64, true);
 		}
 		this.p = p;
+		setStrokeWeight(0); // no stroke by default
 	}
 
 	/**
-	 * Sets X and Y scale, regardless of existing scale.
+	 * Sets the horizontal and vertical scale, regardless of the existing scale.
 	 * 
 	 * @param scale
-	 * @see #scale(float), scales by multiplying existing scale
+	 * @see #scale(float), scales by multiplying the existing scale value
 	 */
 	public void setScale(float scale) {
 		setScale(scale, scale);
 	}
 
+	public void setScale(float scaleX, float scaleY) {
+		scale(scaleX / this.scaleX, scaleY / this.scaleY);
+	}
+
 	/**
+	 * 
 	 * Scales scale by current scale.
+	 * 
+	 * * Increases or decreases the size of the text by expanding and contracting
+	 * vertices. Transformations apply to everything that happens after and
+	 * subsequent calls to the function multiply the effect. For example, calling
+	 * scale(2.0) and then scale(1.5) is the same as scale(3.0).
 	 * 
 	 * @see #setScale(float)
 	 */
@@ -87,6 +96,8 @@ public class VectorText extends PShape {
 	 * vertices. Transformations apply to everything that happens after and
 	 * subsequent calls to the function multiply the effect. For example, calling
 	 * scale(2.0) and then scale(1.5) is the same as scale(3.0).
+	 * 
+	 * @see #setScale(float, float)
 	 */
 	@Override
 	public void scale(float x, float y) {
@@ -99,30 +110,36 @@ public class VectorText extends PShape {
 		super.scale(x, y);
 	}
 
+	@Override
+	public void scale(float x, float y, float z) {
+		scale(x, y);
+	}
+
 	/**
 	 * Set the height of text (precisely, the height of the bounding box)
 	 * 
 	 * @param width
 	 */
 	public void setTextWidth(float width) {
-		final float factor = width/this.width;
+		final float factor = width / this.width;
 		scale(factor, 1);
 	}
 
 	public void setTextHeight(float height) {
-		final float factor = height/this.height;
+		final float factor = height / this.height;
 		scale(1, factor);
 	}
-	
+
 	/**
 	 * Set the font to the font given
+	 * 
 	 * @param font
 	 */
 	public void setFont(PFont font) {
 		this.font = font;
 		setText(text);
 	}
-	
+
 	/**
 	 * 
 	 * @param font an installed system font, identified by its name
@@ -138,10 +155,6 @@ public class VectorText extends PShape {
 
 	public void scaleWidth(float scaleX) {
 		setScale(scaleX, 1);
-	}
-
-	public void setScale(float scaleX, float scaleY) {
-		scale(scaleX / this.scaleX, scaleY / this.scaleY);
 	}
 
 	public String getText() {
@@ -168,7 +181,7 @@ public class VectorText extends PShape {
 
 		this.text = new String(text);
 
-		float translationX = -charWhiteSpace(text[0]) / 2; // running total of character x-axis translation
+		float translationX = -charWhiteSpace(text[0]) / 2; // a running total of character x-axis translation
 
 		for (Character c : text) {
 			PShape character = font.getShape(c);
@@ -182,7 +195,6 @@ public class VectorText extends PShape {
 				character.setVertex(i, newX, character.getVertexY(i));
 			}
 
-//			character.translate(translationX, 0);
 			character.disableStyle(); // parent should override style
 
 			addChild(character);
@@ -190,58 +202,56 @@ public class VectorText extends PShape {
 			translationX += charWidth(c); // width() returns width with size 1, so scale up
 			translationX -= characterSpacing;
 
-//			height = PApplet.max(height, charHeight(c));
 			charDescent.add(getMaxY(character)); // store this character's descent value
 		}
 
-//		width = getWidth(this); // width from charWidth()
-		width = translationX - charWhiteSpace(text[text.length - 1]) / 2f;
-//		width = getMaxX(this) - getMinX(this);
-//		parent.height = (font.ascent() + font.descent())*font.getSize();
+		width = translationX - charWhiteSpace(text[text.length - 1]) / 2f; // take away whitespace of last char
+
 		height = getHeight(this);
-//		height = Float.MIN_VALUE;
-//		width = 0;
-//		for (Character c : text) {
-////			height = p.max(height, charHeight(c));
-//			width += font.getGlyph(c).width * scale;
-//			width += charWhiteSpace(c);
-//		}
 		descent = getMaxY(this);
 	}
 
 	/**
-	 * Debug info is aligned with text when shapeMode(CENTER).
+	 * Draws debug info (string bounding box, per-character bounding boxes,
+	 * character verticies and the baseline) Debug info is aligned with the text
+	 * when shapeMode(CENTER) is used (Processing's default).
 	 * 
-	 * @param mouseX
-	 * @param mouseY
+	 * @param posX
+	 * @param posY
 	 */
-	public void debug(float mouseX, float mouseY) {
+	public void debug(float posX, float posY) {
+		
 		float translationX = 0;
 
-		p.pushStyle(); // save style
-
-		p.stroke(0);
-		p.strokeWeight(3);
+		p.pushStyle(); // save existing style
+		
 		/**
 		 * Draw string bounding box (excludes whitespace)
 		 */
-		p.rect(mouseX, mouseY + descent * scaleY, width, -height);
+		p.stroke(0);
+		p.strokeWeight(4);
+		p.rect(posX, posY + descent * scaleY, width, -height);
 
-		p.strokeWeight(2);
-		p.line(mouseX, mouseY, mouseX + width, mouseY); // baseline
-
-		p.stroke(0, 255, 0);
-
+		
 		/**
 		 * Draw per-character bounding boxes (includes per-char whitespace)
 		 */
+		p.stroke(0, 255, 0);
+		p.strokeWeight(2);
 		for (int i = 0; i < text.toCharArray().length; i++) {
 			Character c = text.toCharArray()[i];
 			// halve char whitespace (to get white space at each side)
-			p.rect(translationX + mouseX - charWhiteSpace(text.charAt(0)) / 2, mouseY + charDescent.get(i) * scaleY, charWidth(c),
+			p.rect(translationX + posX - charWhiteSpace(text.charAt(0)) / 2, posY + charDescent.get(i) * scaleY, charWidth(c),
 					-charHeight(c));
 			translationX += charWidth(c);
 		}
+		
+		/**
+		 * Draw baseline
+		 */
+		p.strokeWeight(4);
+		p.stroke(200, 50,200);
+		p.line(posX, posY, posX + width, posY);
 
 		/**
 		 * Draw vertices as points
@@ -252,7 +262,7 @@ public class VectorText extends PShape {
 		for (int j = 0; j < getChildren().length; j++) {
 			PShape child = getChildren()[j];
 			for (int i = 0; i < child.getVertexCount(); i++) {
-				p.ellipse(child.getVertex(i).x * scaleX + mouseX, child.getVertex(i).y * scaleY + mouseY, 4, 4);
+				p.ellipse(child.getVertex(i).x * scaleX + posX, child.getVertex(i).y * scaleY + posY, 4, 4);
 			}
 		}
 
@@ -279,7 +289,8 @@ public class VectorText extends PShape {
 	}
 
 	/**
-	 * Affected by vector text's current scaling
+	 * Returns the width for a given character Affected by vector text's current
+	 * scaling
 	 * 
 	 * @param c
 	 * @return
@@ -305,7 +316,44 @@ public class VectorText extends PShape {
 	}
 
 	/**
-	 * Rasterise the text and return as a PImage.
+	 * Returns width of the text (including whitespace of the current string)
+	 * 
+	 * @return
+	 */
+	public float getTextWidth() {
+		return width;
+	}
+
+	/**
+	 * Returns exact height of the text (including descent and ascent of the current
+	 * string).
+	 * 
+	 * @return
+	 */
+	public float getTextHeight() {
+		return height;
+	}
+
+	/**
+	 * Gets the whitespace
+	 * 
+	 * @return
+	 */
+	public float getWhiteSpaceLeft() {
+		return charWhiteSpace(text.charAt(0)) / 2;
+	}
+
+	/**
+	 * Gets the whitespace
+	 * 
+	 * @return
+	 */
+	public float getWhiteSpaceRight() {
+		return charWhiteSpace(text.charAt(text.length() - 1)) / 2;
+	}
+
+	/**
+	 * Rasterise the text and returning it as a PImage.
 	 * 
 	 * @return
 	 */
@@ -383,7 +431,8 @@ public class VectorText extends PShape {
 
 	/**
 	 * @param shape PShape (vectorised text)
-	 * @return y difference (height) between lowest and highest points of the shape (including any children shapes)
+	 * @return y difference (height) between lowest and highest points of the shape
+	 *         (including any children shapes)
 	 */
 	private static float getHeight(PShape shape) {
 
