@@ -2,58 +2,83 @@
 
 # PText
 
-**PText** bridges the gap between Processing's PFont and PShape, providing some much needed functionality when working with text in Processing.
+**PText** bridges the gap between Processing's PFont and PShape classes, providing some much needed functionality when working with text in Processing.
 
- and fixes inaccuracies with existing methods such as ...
+PText extends `PShape`, meaning that is stores text in a vector format. With this, it offers methods to:
 
-PText extends `PShape`, meaning that is stores text in a vector format. With this, it offers methods for easy size manipulation and provides other methods to get the exact dimensions of the text. It provides some fully accurate versions of `textWidth()`, `textAscent()`, and `textDescent()` (see the appendix for why these are inaccurate).
+* Easily manipulate text dimensions
+* Get a text's exact bounds (dimensions)
+* Accurately get text's ascent and descent (unlike Processing's existing methods — see [appendix](#Appendix))
+* Visualise per-character bounds, whitespace, and vertices
 
-## API
+# API
 
-Notable parts of the API are described below.
+The PText API is catalogued below.
 
-### `getTextAscent()`
+## Text
 
-Returns, unlike the default PFont implementation which returns the maximum ascent of the font. [baseline](https://www.wikiwand.com/en/Baseline_(typography))
+* **`setText(text)`**
+* **`setFont(fontNameString, fontSize)`**
+* **`setFont(PFont)`**
 
-### `getTextDescent()`
+## Dimensions
 
-For the **font** of the PText  
+* **`scale(both)`**
+* **`scale(x, y)`**
+* **`setScale(both)`**
+* **`setScale(x, y)`**
 
-Likewise, 
+### Width
 
-### `setFont(PFont)`
-### `setFont(String, int)`
+* **`setTextWidth(n)`**
+<p align="center">
+  <a href="https://github.com/micycle1/">
+  <img src="resources/horizontal_resize.gif" alt="example"/></a>
+</p>
 
-Change the font of the text on the fly
-
-
-`setText()`
-
-Change the text of the string in the fly
-
-### `scale()`
-### `scaleWidth()`
-### `scaleHeight()`
-
-scale
-
-### `getTextWidth()`
-### `getTextHeight()`
-
-get exact dimensions (the black bounding box in the example below)
-
-### `debug()`
-Draws debug info (string bounding box, per-character bounding boxes, character verticies and the baseline) Debug info is aligned with the text when shapeMode(CENTER) is used (Processing's default).
-
-### `getWhiteSpaceLeft()`
-### `getWhiteSpaceRight()`
-
-The left version is useful for knowing how much whitespace there is between rendering the text and 
+* **`scaleWidth(n)`**
+* **`getTextWidth()`**
 
 
 
-## Example
+### Height
+
+* **`setTextHeight(n)`**
+<p align="center">
+  <a href="https://github.com/micycle1/">
+  <img src="resources/vertical_resize.gif" alt="example"/></a>
+</p>
+
+* **`scaleHeight(n)`**
+* **`getTextHeight()`**
+
+## Text Attributes
+
+* **`setCharacterSpacing(n)`**
+<p align="center">
+  <a href="https://github.com/micycle1/">
+  <img src="resources/char_spacing2.gif" alt="example"/></a>
+</p>
+
+* **`getTextAscent()`**
+* **`getTextDescent()`**
+* **`getFontAscent()`**
+* **`getFontDescent()`**
+* **`getWhiteSpaceLeft()`**
+* **`getWhiteSpaceRight()`**
+* **`getCharWidth(character)`**
+* **`getCharHeight(character)`**
+* **`getCharWhitespace(character)`**
+
+## Debug
+
+* **`debug()`**
+<p align="center">
+  <a href="https://github.com/micycle1/">
+  <img src="resources/debug.gif" alt="example"/></a>
+</p>
+
+# Example
 
 Resizing a PText shape using setTextWidth() and setTextHeight(), using debug() to show 
 
@@ -93,20 +118,12 @@ void draw() {
 
 
 
-<h1 align="center">
+<p align="center">
   <a href="https://github.com/micycle1/">
   <img src="resources/resize_example.gif" alt="example"/></a>
-</h1>
+</p>
 
-## TODO
-
-* Scale whitespace (to increase/decrease spacing between letters, independent of font size)
-* Display dimension labels (such as ascent & descent) in debug mode
-* String ascent: return the max ascent of the string's **current** characters
-* String descent: return the max descent of the string's **current** characters
-* Allow multiple fonts within one PText at once?
-
-## Appendix
+# Appendix
 
 Using the inbuilt functions `textWidth()`, `textAscent()`, and `textDescent()` are an easy way to get a *good* approximate result for the height and width of a string (of a given font), but they are not *exact*.
 
@@ -117,3 +134,12 @@ Why?
 - `textWidth()` includes glyph whitespace (aka padding; ideally we want to ignore this for the first and last characters)
 
 `textAscent() + textDescent()` therefore measures the **maximum height** of a string in a given font and font size, and not the height of a specific string. In other words, if your text doesn't include both 'd' and 'p' characters, then using these methods to determine text height will overestimate the result.
+
+# TODO
+
+- [x] Scale whitespace (to increase/decrease spacing between letters, independent of font size)
+- [x] Display dimension labels (such as ascent & descent) in debug mode
+- [x] String ascent: return the max ascent of the string's **current** characters
+- [x] String descent: return the max descent of the string's **current** characters
+- [ ] Allow multiple fonts within one PText at once?
+- [ ] Support multiple lines / blocks of text
