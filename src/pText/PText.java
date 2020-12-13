@@ -6,7 +6,10 @@ import processing.core.PGraphics;
 import processing.core.PImage;
 import processing.core.PShape;
 
+import java.text.DecimalFormat;
 import java.util.ArrayList;
+
+import static processing.core.PApplet.round;
 
 /**
  * Vectorised text for Processing. A middleman between PFonts and PShapes. Eases
@@ -19,6 +22,9 @@ public class PText extends PShape {
 
 	// TODO max width, if letter.x > width, new line (offset y too)
 	// TODO return this, for method chaining
+	// TODO TEXT SLANT (offset X based on Y)
+
+	private static final DecimalFormat format = new DecimalFormat("0.0");
 
 	public float scaleX = 1;
 	public float scaleY = 1;
@@ -35,6 +41,8 @@ public class PText extends PShape {
 
 	private float descent = 0; // descent for this specific string
 	private float ascent = 0; // ascent for this specific string
+
+	private float[] perCharacterSpacing; // per-character spacing offset (sum of offsets before)
 
 	/**
 	 * Using a specific font
@@ -90,6 +98,8 @@ public class PText extends PShape {
 	 * subsequent calls to the function multiply the effect. For example, calling
 	 * scale(2.0) and then scale(1.5) is the same as scale(3.0).
 	 * 
+	 * TODO does not affect character spacing
+	 * 
 	 * @see #setScale(float)
 	 */
 	@Override
@@ -128,7 +138,8 @@ public class PText extends PShape {
 	 * @param width
 	 */
 	public void setTextWidth(float width) {
-		final float factor = width / this.width;
+		// TODO account for character spacing
+		final float factor = width / getTextWidth();
 		scale(factor, 1);
 	}
 
@@ -138,7 +149,7 @@ public class PText extends PShape {
 	 * @param height
 	 */
 	public void setTextHeight(float height) {
-		final float factor = height / this.height;
+		final float factor = height / getTextHeight();
 		scale(1, factor);
 	}
 
@@ -185,8 +196,6 @@ public class PText extends PShape {
 		setText(text.toCharArray());
 	}
 
-	int characterSpacing = 0;
-
 	public void setText(char[] text) {
 
 		width = 0;
@@ -208,7 +217,7 @@ public class PText extends PShape {
 
 			/**
 			 * Offset using vertex X position, not translate(), since translation value is
-			 * not accessible.
+			 * not accessible once set.
 			 */
 			for (int i = 0; i < character.getVertexCount(); i++) {
 				float newX = character.getVertexX(i) + translationX;
@@ -220,7 +229,6 @@ public class PText extends PShape {
 			addChild(character);
 
 			translationX += charWidth(c); // width() returns width with size 1, so scale up
-			translationX -= characterSpacing;
 
 			charDescent.add(getMaxY(character)); // store this character's descent value
 		}
@@ -230,7 +238,33 @@ public class PText extends PShape {
 		height = getHeight(this);
 		descent = getMaxY(this);
 		ascent = PApplet.abs(getMinY(this));
+
+		perCharacterSpacing = new float[text.length]; // init per-character spacing all to 0
 	}
+
+	/**
+	 * Sets the spacing between characters. This spacing is absolute (not affected
+	 * by scaling).
+	 * 
+	 * @param spacing negative (characters closer) or positive (characters farther)
+	 */
+	public void setCharacterSpacing(float spacing) {
+
+		float offset = spacing;
+		for (int i = 1; i < getChildCount(); i++) { // start at 1; ignore first character
+			PShape child = getChild(i);
+			child.resetMatrix(); // reset old translation
+			child.translate(offset / scaleX, 0); // current scale affects translate(), so divide to be scale invariant
+			perCharacterSpacing[i] = offset; // write per-character total offset (scaleX invariant)
+			offset += spacing;
+		}
+
+		totalSpacing = offset - spacing; // subtract right-spacing of last character
+		characterSpacing = spacing;
+	}
+
+	private float characterSpacing = 0;
+	private float totalSpacing = 0; // sum of character spacing; not affected by scale
 
 	/**
 	 * Draws debug info (string bounding box, per-character bounding boxes,
@@ -239,72 +273,140 @@ public class PText extends PShape {
 	 * 
 	 * @param posX
 	 * @param posY
+	 * 
 	 */
 	public void debug(float posX, float posY) {
+		debug(posX, posY, true, true, true, true, true, true);
+	}
 
-		float translationX = 0;
+	/**
+	 * 
+	 * @param posX
+	 * @param posY
+	 * @param bounds
+	 * @param charBounds
+	 * @param baseline
+	 * @param vertices
+	 * @param charSpacing
+	 * @param info
+	 */
+	public void debug(float posX, float posY, boolean bounds, boolean charBounds, boolean baseline, boolean vertices, boolean charSpacing,
+			boolean info) {
 
 		p.pushStyle(); // save existing style
-		
+
 		p.noFill();
 
 		/**
 		 * Draw string bounding box (excludes whitespace)
 		 */
-		p.stroke(0);
-		p.strokeWeight(4);
-		p.rect(posX, posY + descent * scaleY, width, -height);
+		if (bounds) {
+			p.stroke(0);
+			p.strokeWeight(4);
+			p.rect(posX, posY + getTextDescent(), getTextWidth(), -getTextHeight());
+		}
 
 		/**
 		 * Draw per-character bounding boxes (includes per-char whitespace)
 		 */
-		p.stroke(0, 255, 0);
-		p.strokeWeight(2);
-		for (int i = 0; i < text.toCharArray().length; i++) {
-			Character c = text.toCharArray()[i];
-			// halve char whitespace (to get white space at each side)
-			p.rect(translationX + posX - charWhiteSpace(text.charAt(0)) / 2, posY + charDescent.get(i) * scaleY, charWidth(c),
-					-charHeight(c));
-			translationX += charWidth(c);
+		if (charBounds) {
+			p.stroke(90, 230, 111);
+			p.strokeWeight(2);
+			float translationX = 0; // running total of character widths
+			for (int i = 0; i < text.length(); i++) {
+				Character c = text.charAt(i);
+				float charXPos = translationX + posX - getWhiteSpaceLeft() + perCharacterSpacing[i];
+				p.rect(charXPos, posY + charDescent.get(i) * scaleY, charWidth(c), -charHeight(c));
+				translationX += charWidth(c);
+			}
 		}
 
 		/**
 		 * Draw baseline
 		 */
-		p.strokeWeight(4);
-		p.stroke(200, 50, 200);
-		p.line(posX, posY, posX + width, posY);
+		if (baseline) {
+			p.strokeWeight(4);
+			p.stroke(180, 90, 230);
+			p.line(posX, posY, posX + getTextWidth(), posY);
+		}
+
+		/*
+		 * Draw character spacing
+		 */
+		if (charSpacing && characterSpacing != 0) {
+			p.strokeWeight(3);
+			if (characterSpacing < 0) {
+				p.stroke(230, 90, 90); // pale red
+			} else {
+				p.stroke(230, 210, 90); // pale yellow
+			}
+			float spacingOffset = posX + charWidth(text.charAt(0)) - getWhiteSpaceLeft(); // x pos of previous char bounding
+																							// box (right side)
+			for (int i = 1; i < text.length(); i++) {
+				p.line(spacingOffset + perCharacterSpacing[i - 1], posY - getTextAscent() / 2, spacingOffset + perCharacterSpacing[i],
+						posY - getTextAscent() / 2);
+				spacingOffset += charWidth(text.charAt(i));
+			}
+			/**
+			 * Draw boxes instead
+			 */
+//			spacingOffset = charWidth(text.charAt(0));
+//			for (int i = 1; i < text.length() - 1; i++) {
+//				Character c = text.charAt(i);
+//				float charXPos = spacingOffset + posX - getWhiteSpaceLeft() + perCharacterSpacing[i];
+//				p.rect(charXPos - characterSpacing / 2, posY + charDescent.get(i) * scaleY, charWidth(c) + characterSpacing,
+//						-charHeight(c));
+//				spacingOffset += charWidth(c);
+//			}
+		}
 
 		/**
 		 * Draw vertices as points
 		 */
-		p.fill(0, 255, 0); // modify style
-		p.noStroke(); // modify style
-		p.ellipseMode(CENTER); // draw exactly on point
-		for (int j = 0; j < getChildren().length; j++) {
-			PShape child = getChildren()[j];
-			for (int i = 0; i < child.getVertexCount(); i++) {
-				p.ellipse(child.getVertex(i).x * scaleX + posX, child.getVertex(i).y * scaleY + posY, 4, 4);
+		if (vertices) {
+			p.stroke(0, 255, 0); // modify style
+			p.strokeWeight(4);
+			p.ellipseMode(CENTER); // draw exactly on point
+			for (int j = 0; j < getChildren().length; j++) {
+				PShape child = getChildren()[j];
+				for (int i = 0; i < child.getVertexCount(); i++) {
+					p.point((child.getVertex(i).x) * scaleX + posX + perCharacterSpacing[j], child.getVertex(i).y * scaleY + posY);
+				}
 			}
 		}
 
+		/*
+		 * Draw text dimensions info
+		 */
+		if (info) {
+			p.textSize(14);
+			p.fill(0);
+			p.textAlign(LEFT);
+			p.text(String.format("Width: %s Height: %s Ascent: %s Descent: %s Char Spacing: %s", round(getTextWidth()),
+					round(getTextHeight()), format(getTextAscent()), format(getTextDescent()), format(characterSpacing)), posX,
+					posY - getTextAscent() - 14);
+		}
 		p.popStyle(); // return saved style
 
 	}
 
 	/**
-	 * Above the line (based on letter 'd')
+	 * Returns the font's ascent (distance from the top of the tallest glyph (letter
+	 * 'd') to the baseline).
 	 * 
 	 * @return
+	 * @see #getTextAscent()
 	 */
 	public float ascent() {
 		return font.ascent() * font.getSize() * scaleY;
 	}
 
 	/**
-	 * Below the line (based on letter 'p')
+	 * Returns the font's descent (distance from the baseline to the bottom of the
+	 * lowest descenders of the glyphs (letter 'p'))
 	 * 
 	 * @return
+	 * @see #getTextDescent()
 	 */
 	public float descent() {
 		return font.descent() * font.getSize() * scaleY;
@@ -328,7 +430,8 @@ public class PText extends PShape {
 	/**
 	 * Get horizontal character whitespace (difference between font char and glyph).
 	 * The whitespace is the sum of the whitespace to the left of the char and the
-	 * whitespace to the right of the char.
+	 * whitespace to the right of the char. Not affected by
+	 * {@link #setCharacterSpacing(float)}.
 	 * 
 	 * @param c
 	 * @return
@@ -338,12 +441,13 @@ public class PText extends PShape {
 	}
 
 	/**
-	 * Returns width of the text (including whitespace of the current string)
+	 * Returns horizontal bounds/width of the text (including whitespace of the
+	 * current string)
 	 * 
 	 * @return
 	 */
 	public float getTextWidth() {
-		return width;
+		return width + totalSpacing;
 	}
 
 	/**
@@ -355,7 +459,7 @@ public class PText extends PShape {
 	public float getTextHeight() {
 		return height;
 	}
-	
+
 	/**
 	 * Returns the descent (the maximum height of any character below the baseline)
 	 * of the current text
@@ -531,6 +635,16 @@ public class PText extends PShape {
 			}
 		}
 		return max;
+	}
+
+	/**
+	 * Format to 1 d.p.
+	 * 
+	 * @param n
+	 * @return
+	 */
+	private static String format(float n) {
+		return format.format(n);
 	}
 
 }
