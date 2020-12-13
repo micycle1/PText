@@ -210,7 +210,7 @@ public class PText extends PShape {
 
 		this.text = new String(text);
 
-		float translationX = -charWhiteSpace(text[0]) / 2; // a running total of character x-axis translation
+		float translationX = -getCharWhiteSpace(text[0]) / 2; // a running total of character x-axis translation
 
 		for (Character c : text) {
 			PShape character = font.getShape(c);
@@ -228,12 +228,12 @@ public class PText extends PShape {
 
 			addChild(character);
 
-			translationX += charWidth(c); // width() returns width with size 1, so scale up
+			translationX += getCharWidth(c); // width() returns width with size 1, so scale up
 
 			charDescent.add(getMaxY(character)); // store this character's descent value
 		}
 
-		width = translationX - charWhiteSpace(text[text.length - 1]) / 2f; // take away whitespace of last char
+		width = translationX - getCharWhiteSpace(text[text.length - 1]) / 2f; // take away whitespace of last char
 
 		height = getHeight(this);
 		descent = getMaxY(this);
@@ -316,8 +316,8 @@ public class PText extends PShape {
 			for (int i = 0; i < text.length(); i++) {
 				Character c = text.charAt(i);
 				float charXPos = translationX + posX - getWhiteSpaceLeft() + perCharacterSpacing[i];
-				p.rect(charXPos, posY + charDescent.get(i) * scaleY, charWidth(c), -charHeight(c));
-				translationX += charWidth(c);
+				p.rect(charXPos, posY + charDescent.get(i) * scaleY, getCharWidth(c), -getCharHeight(c));
+				translationX += getCharWidth(c);
 			}
 		}
 
@@ -340,12 +340,12 @@ public class PText extends PShape {
 			} else {
 				p.stroke(230, 210, 90); // pale yellow
 			}
-			float spacingOffset = posX + charWidth(text.charAt(0)) - getWhiteSpaceLeft(); // x pos of previous char bounding
+			float spacingOffset = posX + getCharWidth(text.charAt(0)) - getWhiteSpaceLeft(); // x pos of previous char bounding
 																							// box (right side)
 			for (int i = 1; i < text.length(); i++) {
 				p.line(spacingOffset + perCharacterSpacing[i - 1], posY - getTextAscent() / 2, spacingOffset + perCharacterSpacing[i],
 						posY - getTextAscent() / 2);
-				spacingOffset += charWidth(text.charAt(i));
+				spacingOffset += getCharWidth(text.charAt(i));
 			}
 			/**
 			 * Draw boxes instead
@@ -397,7 +397,7 @@ public class PText extends PShape {
 	 * @return
 	 * @see #getTextAscent()
 	 */
-	public float ascent() {
+	public float getFontAscent() {
 		return font.ascent() * font.getSize() * scaleY;
 	}
 
@@ -408,7 +408,7 @@ public class PText extends PShape {
 	 * @return
 	 * @see #getTextDescent()
 	 */
-	public float descent() {
+	public float getFontDescent() {
 		return font.descent() * font.getSize() * scaleY;
 	}
 
@@ -419,11 +419,11 @@ public class PText extends PShape {
 	 * @param c
 	 * @return
 	 */
-	public float charWidth(Character c) {
+	public float getCharWidth(Character c) {
 		return font.width(c) * font.getSize() * scaleX;
 	}
 
-	public float charHeight(Character c) {
+	public float getCharHeight(Character c) {
 		return font.getGlyph(c).height * scaleY;
 	}
 
@@ -436,8 +436,8 @@ public class PText extends PShape {
 	 * @param c
 	 * @return
 	 */
-	public float charWhiteSpace(Character c) {
-		return charWidth(c) - (font.getGlyph(c).width * scaleX);
+	public float getCharWhiteSpace(Character c) {
+		return getCharWidth(c) - (font.getGlyph(c).width * scaleX);
 	}
 
 	/**
@@ -493,7 +493,7 @@ public class PText extends PShape {
 	 * @return
 	 */
 	public float getWhiteSpaceLeft() {
-		return charWhiteSpace(text.charAt(0)) / 2;
+		return getCharWhiteSpace(text.charAt(0)) / 2;
 	}
 
 	/**
@@ -502,7 +502,7 @@ public class PText extends PShape {
 	 * @return
 	 */
 	public float getWhiteSpaceRight() {
-		return charWhiteSpace(text.charAt(text.length() - 1)) / 2;
+		return getCharWhiteSpace(text.charAt(text.length() - 1)) / 2;
 	}
 
 	/**
@@ -511,7 +511,7 @@ public class PText extends PShape {
 	 * @return
 	 */
 	public PImage get() {
-		PGraphics temp = p.createGraphics((int) width, (int) (height + descent()));
+		PGraphics temp = p.createGraphics((int) width, (int) (height + getFontDescent()));
 		temp.smooth();
 		temp.beginDraw();
 		temp.shape(this, 0, height);

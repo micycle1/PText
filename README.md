@@ -116,13 +116,6 @@ void draw() {
 }
 ```
 
-
-
-<p align="center">
-  <a href="https://github.com/micycle1/">
-  <img src="resources/resize_example.gif" alt="example"/></a>
-</p>
-
 # Appendix
 
 Using the inbuilt functions `textWidth()`, `textAscent()`, and `textDescent()` are an easy way to get a *good* approximate result for the height and width of a string (of a given font), but they are not *exact*.
