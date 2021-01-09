@@ -1,13 +1,19 @@
 package pText;
 
+import static processing.core.PApplet.sin;
+import static processing.core.PApplet.cos;
+import static processing.core.PApplet.abs;
+
 import processing.core.PApplet;
 import processing.core.PFont;
 import processing.core.PGraphics;
 import processing.core.PImage;
 import processing.core.PShape;
+import processing.core.PVector;
 
 import java.text.DecimalFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 
 import static processing.core.PApplet.round;
 
@@ -22,7 +28,10 @@ public class PText extends PShape {
 
 	// TODO max width, if letter.x > width, new line (offset y too)
 	// TODO return this, for method chaining
-	// TODO TEXT SLANT (offset X based on Y)
+	// TODO TEXT SLANT (based on Y)
+	// TODO ttf fonts
+	// TODO use javadocs from
+	// https://learning.oreilly.com/library/view/java-awt-reference/9781565922402/06_chapter-03.html
 
 	private static final DecimalFormat format = new DecimalFormat("0.0");
 
@@ -37,12 +46,20 @@ public class PText extends PShape {
 
 	private String text;
 
-	private ArrayList<Float> charDescent = new ArrayList<Float>();
+	private ArrayList<Float> charDescent = new ArrayList<Float>(); // used to draw debug outlines
 
 	private float descent = 0; // descent for this specific string
 	private float ascent = 0; // ascent for this specific string
 
+	private float characterSpacing = 0;
+	private float totalSpacing = 0; // sum of character spacing; not affected by scale
 	private float[] perCharacterSpacing; // per-character spacing offset (sum of offsets before)
+
+	private float[] perCharacterRotation; // per-character rotation
+
+	private PVector perCharacterCenterPoint[];
+
+	private float shearX = 0; // current shearX
 
 	/**
 	 * Using a specific font
@@ -53,17 +70,17 @@ public class PText extends PShape {
 	public PText(PApplet p, PFont font) {
 		super(p.getGraphics(), GROUP);
 		if (font == null) {
-			font = p.createFont("Arial", 64, true);
-			System.err.println("ERROR: Null PFont. Defaulting to Arial, 64 pt.");
-		} else {
-			this.font = font;
+			String randomFont = PFont.list()[PApplet.round(p.random(PFont.list().length))];
+			font = p.createFont(randomFont, 96, true);
+			System.err.println(String.format("ERROR: Null PFont. Using a random system font (%s), 96 pt.", randomFont));
 		}
+		this.font = font;
 		this.p = p;
 		setStrokeWeight(0); // no stroke by default
 	}
 
 	/**
-	 * Uses current sketch font (Arial if no sketch font).
+	 * Uses current sketch font (random system font if no sketch font).
 	 * 
 	 * @param p
 	 */
@@ -212,25 +229,31 @@ public class PText extends PShape {
 
 		float translationX = -getCharWhiteSpace(text[0]) / 2; // a running total of character x-axis translation
 
-		for (Character c : text) {
+		perCharacterCenterPoint = new PVector[text.length]; // calculate during iteration // TODO change when scaled
+
+		for (int i = 0; i < text.length; i++) {
+			Character c = text[i];
 			PShape character = font.getShape(c);
 
 			/**
 			 * Offset using vertex X position, not translate(), since translation value is
-			 * not accessible once set.
+			 * not accessible once set. This means Y values will be around 0.
 			 */
-			for (int i = 0; i < character.getVertexCount(); i++) {
-				float newX = character.getVertexX(i) + translationX;
-				character.setVertex(i, newX, character.getVertexY(i));
+			for (int j = 0; j < character.getVertexCount(); j++) {
+				float newX = character.getVertexX(j) + translationX;
+				character.setVertex(j, newX, character.getVertexY(j));
 			}
 
-			character.disableStyle(); // parent should override style
+			character.disableStyle(); // parent PText should override style
 
 			addChild(character);
 
 			translationX += getCharWidth(c); // width() returns width with size 1, so scale up
 
 			charDescent.add(getMaxY(character)); // store this character's descent value
+
+			perCharacterCenterPoint[i] = getCenterPoint(character);
+			p.println(perCharacterCenterPoint[i]);
 		}
 
 		width = translationX - getCharWhiteSpace(text[text.length - 1]) / 2f; // take away whitespace of last char
@@ -240,6 +263,8 @@ public class PText extends PShape {
 		ascent = PApplet.abs(getMinY(this));
 
 		perCharacterSpacing = new float[text.length]; // init per-character spacing all to 0
+		perCharacterRotation = new float[text.length]; // init per-character spacing all to 0
+
 	}
 
 	/**
@@ -263,13 +288,97 @@ public class PText extends PShape {
 		characterSpacing = spacing;
 	}
 
-	private float characterSpacing = 0;
-	private float totalSpacing = 0; // sum of character spacing; not affected by scale
+	/**
+	 * Shear text in the X direction, based on the text's base line. Use this to
+	 * italicise text.
+	 * 
+	 * @param x Defines the X offset of points which have the highest Y position.
+	 *          Can be negative
+	 */
+	public void setShearX(float shear) {
+
+		/**
+		 * The built-in shearX() affects transformation matrix only, not the location of
+		 * a PShape's vertices TODO variable baseline
+		 */
+
+		shear *= -1;
+
+		float logicalShear = shear - shearX; // only shear the difference between old and new shear
+
+		// the built-in shearX() affects the matrix only, not the vertices location (and
+		// there's no way to apply the matrix to vertices, so do manually here.
+
+		if (logicalShear != 0) { // save on compute if no change needed
+
+			for (PShape child : getChildren()) { // search all children PShapes
+				for (int i = 0; i < child.getVertexCount(); i++) {
+					PVector vertex = child.getVertex(i);
+					vertex.x += PApplet.map(vertex.y, 0, getTextAscent(), 0, logicalShear);
+					child.setVertex(i, vertex); // need to call setVertex() to apply change
+
+//					vertex.y += PApplet.map(vertex.x, 0, getTextWidth(), -logicalShear, logicalShear);
+//					child.setVertex(i, vertex); // need to call setVertex() to apply change
+				}
+			}
+		}
+
+		shearX = shear;
+
+	}
+
+	/**
+	 * Sets the rotation for a character, given by it's index in the string. Rotates
+	 * the character around midpoint of its vertices, not the baseline.
+	 * 
+	 * @param index index of character in string
+	 * @param angle radians
+	 * @see #setCharacterRotation(float)
+	 */
+	public void setCharacterRotation(final int index, float angle) {
+		if (index >= 0 && index < getChildCount()) {
+
+			angle %= TWO_PI;// set angle in range -2PI...2PI
+			angle = angle < 0 ? TWO_PI + angle : angle; // make angle positive: 0...2PI
+
+			float angleDiff = angle - perCharacterRotation[index]; // calc diff between new and current angle
+			angleDiff = (angleDiff + PI) % TWO_PI - PI;
+			perCharacterRotation[index] = angle;
+
+			if (angleDiff != 0) { // don't rotate if none needed
+
+				/**
+				 * = Mutates the shape's vertices, rather than using translation matrix.
+				 */
+				PShape character = getChild(index);
+				PVector centerPoint = getCenterPoint(character); // TODO possibly cache value
+				for (int i = 0; i < character.getVertexCount(); i++) {
+					character.setVertex(i, rotateAroundPoint(character.getVertex(i), centerPoint, angleDiff));
+				}
+			}
+
+		} else {
+			System.err.println("Character index out of bounds.");
+		}
+
+	}
+
+	/**
+	 * Sets the rotation for every character in the string.
+	 * 
+	 * @param angle
+	 * @see PText#setCharacterRotation(int, float)
+	 */
+	public void setCharacterRotation(float angle) {
+		for (int i = 0; i < getChildCount(); i++) {
+			setCharacterRotation(i, angle);
+		}
+	}
 
 	/**
 	 * Draws debug info (string bounding box, per-character bounding boxes,
-	 * character verticies and the baseline) Debug info is aligned with the text
-	 * when shapeMode(CENTER) is used (Processing's default).
+	 * character vertices and the baseline) Debug info is aligned with the text when
+	 * shapeMode(CENTER) is used (Processing's default).
 	 * 
 	 * @param posX
 	 * @param posY
@@ -290,8 +399,8 @@ public class PText extends PShape {
 	 * @param charSpacing
 	 * @param info
 	 */
-	public void debug(float posX, float posY, boolean bounds, boolean charBounds, boolean baseline, boolean vertices, boolean charSpacing,
-			boolean info) {
+	public void debug(float posX, float posY, boolean bounds, boolean charBounds, boolean baseline, boolean vertices,
+			boolean charSpacing, boolean info) {
 
 		p.pushStyle(); // save existing style
 
@@ -313,11 +422,28 @@ public class PText extends PShape {
 			p.stroke(90, 230, 111);
 			p.strokeWeight(2);
 			float translationX = 0; // running total of character widths
-			for (int i = 0; i < text.length(); i++) {
-				Character c = text.charAt(i);
-				float charXPos = translationX + posX - getWhiteSpaceLeft() + perCharacterSpacing[i];
-				p.rect(charXPos, posY + charDescent.get(i) * scaleY, getCharWidth(c), -getCharHeight(c));
-				translationX += getCharWidth(c);
+
+			if (shearX == 0) {
+				for (int i = 0; i < text.length(); i++) {
+					final Character c = text.charAt(i);
+					final float charXPos = translationX + posX - getWhiteSpaceLeft() + perCharacterSpacing[i];
+//					p.pushMatrix();
+//					p.translate(perCharacterCenterPoint[i].x, perCharacterCenterPoint[i].y + posY);
+//					p.rotate(perCharacterRotation[i]);
+//					p.rect(0, 0, getCharWidth(c), -getCharHeight(c));
+//					p.popMatrix();
+
+					p.rect(charXPos, posY + charDescent.get(i) * scaleY, getCharWidth(c), -getCharHeight(c));
+					translationX += getCharWidth(c);
+				}
+			} else { // TODO
+				for (int i = 0; i < text.length(); i++) {
+					float w = getWidth(getChild(i)) + getCharWhiteSpace(text.charAt(i));
+					Character c = text.charAt(i);
+					float charXPos = translationX + posX - getWhiteSpaceLeft() + perCharacterSpacing[i];
+					p.rect(charXPos, posY + charDescent.get(i) * scaleY, w, -getCharHeight(c));
+					translationX += w;
+				}
 			}
 		}
 
@@ -340,11 +466,12 @@ public class PText extends PShape {
 			} else {
 				p.stroke(230, 210, 90); // pale yellow
 			}
-			float spacingOffset = posX + getCharWidth(text.charAt(0)) - getWhiteSpaceLeft(); // x pos of previous char bounding
-																							// box (right side)
+			float spacingOffset = posX + getCharWidth(text.charAt(0)) - getWhiteSpaceLeft(); // x pos of previous char
+																								// bounding
+																								// box (right side)
 			for (int i = 1; i < text.length(); i++) {
-				p.line(spacingOffset + perCharacterSpacing[i - 1], posY - getTextAscent() / 2, spacingOffset + perCharacterSpacing[i],
-						posY - getTextAscent() / 2);
+				p.line(spacingOffset + perCharacterSpacing[i - 1], posY - getTextAscent() / 2,
+						spacingOffset + perCharacterSpacing[i], posY - getTextAscent() / 2);
 				spacingOffset += getCharWidth(text.charAt(i));
 			}
 			/**
@@ -370,7 +497,8 @@ public class PText extends PShape {
 			for (int j = 0; j < getChildren().length; j++) {
 				PShape child = getChildren()[j];
 				for (int i = 0; i < child.getVertexCount(); i++) {
-					p.point((child.getVertex(i).x) * scaleX + posX + perCharacterSpacing[j], child.getVertex(i).y * scaleY + posY);
+					p.point((child.getVertex(i).x) * scaleX + posX + perCharacterSpacing[j],
+							child.getVertex(i).y * scaleY + posY);
 				}
 			}
 		}
@@ -383,8 +511,8 @@ public class PText extends PShape {
 			p.fill(0);
 			p.textAlign(LEFT);
 			p.text(String.format("Width: %s Height: %s Ascent: %s Descent: %s Char Spacing: %s", round(getTextWidth()),
-					round(getTextHeight()), format(getTextAscent()), format(getTextDescent()), format(characterSpacing)), posX,
-					posY - getTextAscent() - 14);
+					round(getTextHeight()), format(getTextAscent()), format(getTextDescent()),
+					format(characterSpacing)), posX, posY - getTextAscent() - 14);
 		}
 		p.popStyle(); // return saved style
 
@@ -462,7 +590,7 @@ public class PText extends PShape {
 
 	/**
 	 * Returns the descent (the maximum height of any character below the baseline)
-	 * of the current text
+	 * of the current text. The units for this measurement are pixels.
 	 * 
 	 * @return
 	 */
@@ -477,7 +605,7 @@ public class PText extends PShape {
 
 	/**
 	 * Returns the ascent (the maximum height of any character above the baseline)
-	 * of the current text
+	 * of the current text. The units for this measurement are pixels.
 	 * 
 	 * @return
 	 */
@@ -518,6 +646,21 @@ public class PText extends PShape {
 		temp.endDraw();
 
 		return temp.get();
+	}
+
+	/**
+	 * 
+	 * @param index
+	 * @return
+	 * @deprecated , see {@link #getChild(int)} ?
+	 */
+	public PShape getCharacterAsPShape(int index) {
+		if (index >= 0 && index < getChildCount()) {
+			return getChild(index);
+		} else {
+			System.err.println("Character index out of bounds.");
+			return null;
+		}
 	}
 
 	/**
@@ -567,26 +710,52 @@ public class PText extends PShape {
 	}
 
 	/**
-	 * Return value of smallest (up-most) Y coordinate from shape (may return
-	 * negative values)
+	 * Using shape() draws text according to LEFT,BASELINE. Use this method to draw
+	 * at a custom, similar to textAlign()
 	 * 
-	 * @param shape
-	 * @return
+	 * @param x
+	 * @param y
+	 * @param alignX horizontal alignment, either LEFT, CENTER, or RIGHT
+	 * @param alignY vertical alignment, either TOP, BOTTOM, CENTER, or BASELINE
+	 * 
 	 */
-	private static float getMinY(PShape shape) {
-		float min = Float.MAX_VALUE;
-		if (shape.getFamily() == GROUP) {
-			for (PShape child : shape.getChildren()) { // search all children PShapes
-				for (int i = 0; i < child.getVertexCount(); i++) {
-					min = PApplet.min(child.getVertex(i).y, min);
-				}
-			}
-		} else {
-			for (int i = 0; i < shape.getVertexCount(); i++) { // search only parent PShape
-				min = PApplet.min(shape.getVertex(i).y, min);
-			}
+	public void draw(float x, float y, int alignX, int alignY) {
+
+		final float offsetX;
+		final float offsetY;
+
+		switch (alignX) {
+			case RIGHT:
+				offsetX = -getTextWidth();
+				break;
+			case CENTER:
+				offsetX = -getTextWidth() / 2;
+				break;
+			default:
+				System.err.println("Unrecognised X alignment. Defaulting to LEFT.");
+			case LEFT:
+				offsetX = 0;
+				break;
 		}
-		return min;
+
+		switch (alignY) {
+			case TOP:
+				offsetY = getTextAscent();
+				break;
+			case CENTER:
+				offsetY = -getTextDescent() + getTextHeight() / 2;
+				break;
+			case BOTTOM:
+				offsetY = -getTextDescent();
+				break;
+			default:
+				System.err.println("Unrecognised X alignment. Defaulting to BASELINE.");
+			case BASELINE:
+				offsetY = 0;
+		}
+
+		p.shape(this, x + offsetX, y + offsetY);
+
 	}
 
 	/**
@@ -616,6 +785,30 @@ public class PText extends PShape {
 	}
 
 	/**
+	 * Return value of smallest (up-most) Y coordinate from shape (may return
+	 * negative values)
+	 * 
+	 * @param shape
+	 * @return
+	 */
+	private static float getMinY(PShape shape) {
+		float min = Float.MAX_VALUE;
+		if (shape.getFamily() == GROUP) {
+			for (PShape child : shape.getChildren()) { // search all children PShapes
+				for (int i = 0; i < child.getVertexCount(); i++) {
+					min = PApplet.min(child.getVertex(i).y, min);
+				}
+			}
+		} else {
+			for (int i = 0; i < shape.getVertexCount(); i++) { // search only parent PShape
+				min = PApplet.min(shape.getVertex(i).y, min);
+
+			}
+		}
+		return min;
+	}
+
+	/**
 	 * Return value of greatest (down-most) Y coordinate from shape
 	 * 
 	 * @param shape
@@ -635,6 +828,126 @@ public class PText extends PShape {
 			}
 		}
 		return max;
+	}
+
+	/**
+	 * @param shape PShape (vectorised text)
+	 * @return x difference (width) between left-most and right-most points of the
+	 *         shape (including any children shapes)
+	 */
+	private static float getWidth(PShape shape) {
+
+		float min = Float.MAX_VALUE;
+		float max = Float.NEGATIVE_INFINITY;
+
+		if (shape.getFamily() == GROUP) {
+			for (PShape child : shape.getChildren()) { // search all children PShapes
+				for (int i = 0; i < child.getVertexCount(); i++) {
+					min = PApplet.min(child.getVertex(i).x, min);
+					max = PApplet.max(child.getVertex(i).x, max);
+				}
+			}
+		} else {
+			for (int i = 0; i < shape.getVertexCount(); i++) { // search only parent PShape
+				min = PApplet.min(shape.getVertex(i).x, min);
+				max = PApplet.max(shape.getVertex(i).x, max);
+			}
+		}
+		return max - min;
+	}
+
+	/**
+	 * Return value of smallest (left-most) X coordinate from shape (may return
+	 * negative values)
+	 * 
+	 * @param shape
+	 * @return
+	 */
+	private static float getMinX(PShape shape) {
+		float min = Float.MAX_VALUE;
+		if (shape.getFamily() == GROUP) {
+			for (PShape child : shape.getChildren()) { // search all children PShapes
+				for (int i = 0; i < child.getVertexCount(); i++) {
+					min = PApplet.min(child.getVertex(i).x, min);
+				}
+			}
+		} else {
+			for (int i = 0; i < shape.getVertexCount(); i++) { // search only parent PShape
+				min = PApplet.min(shape.getVertex(i).x, min);
+
+			}
+		}
+		return min;
+	}
+
+	/**
+	 * Return value of greatest (right-most) X coordinate from shape
+	 * 
+	 * @param shape
+	 * @return
+	 */
+	private static float getMaxX(PShape shape) {
+		float max = Float.NEGATIVE_INFINITY;
+		if (shape.getFamily() == GROUP) {
+			for (PShape child : shape.getChildren()) { // search all children PShapes
+				for (int i = 0; i < child.getVertexCount(); i++) {
+					max = PApplet.max(child.getVertex(i).x, max);
+				}
+			}
+		} else {
+			for (int i = 0; i < shape.getVertexCount(); i++) { // search only parent PShape
+				max = PApplet.max(shape.getVertex(i).x, max);
+			}
+		}
+		return max;
+	}
+
+	/**
+	 * Return value of greatest (right-most) X coordinate from shape
+	 * 
+	 * @param shape
+	 * @return
+	 */
+	private static PVector getCenterPoint(PShape shape) {
+
+		// TODO call when PText scaled etc
+
+		PVector centerPoint = new PVector();
+
+		if (shape.getFamily() == GROUP) {
+			int n = 0;
+			for (PShape child : shape.getChildren()) { // search all children PShapes
+				for (int i = 0; i < child.getVertexCount(); i++) {
+					centerPoint.x += child.getVertexX(i);
+					centerPoint.y += child.getVertexY(i);
+					n++;
+				}
+			}
+			centerPoint.div(n);
+		} else {
+			for (int i = 0; i < shape.getVertexCount(); i++) { // search only parent PShape
+				centerPoint.x += shape.getVertexX(i);
+				centerPoint.y += shape.getVertexY(i);
+			}
+			centerPoint.div(shape.getVertexCount()); // divide total by n vertices
+		}
+		return centerPoint;
+	}
+
+	/**
+	 * Rotates the point around the center
+	 * 
+	 * @param pvector PVector to rotate
+	 * @param pointX
+	 * @param pointY
+	 * @param angle   radians
+	 * @return
+	 */
+	private static PVector rotateAroundPoint(PVector point, PVector center, float angle) {
+		float rotatedX = cos(angle) * (point.x - center.x) - sin(angle) * (point.y - center.y) + center.x;
+		float rotatedY = sin(angle) * (point.x - center.x) + cos(angle) * (point.y - center.y) + center.y;
+		return new PVector(rotatedX, rotatedY);
+
 	}
 
 	/**
