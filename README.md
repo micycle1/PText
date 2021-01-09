@@ -9,6 +9,7 @@ PText extends `PShape`, meaning that is stores text in a vector format. With thi
 * Easily manipulate text dimensions
 * Get a text's exact bounds (dimensions)
 * Accurately get text's ascent and descent (unlike Processing's existing methods — see [appendix](#Appendix))
+* Manipulate text characteristics (such as shear and per-character rotation)
 * Visualise per-character bounds, whitespace, and vertices
 
 # API
@@ -52,13 +53,7 @@ The PText API is catalogued below.
 * **`scaleHeight(n)`**
 * **`getTextHeight()`**
 
-## Text Attributes
-
-* **`setCharacterSpacing(n)`**
-<p align="center">
-  <a href="https://github.com/micycle1/">
-  <img src="resources/char_spacing2.gif" alt="example"/></a>
-</p>
+## Other Text Metrics
 
 * **`getTextAscent()`**
 * **`getTextDescent()`**
@@ -70,6 +65,31 @@ The PText API is catalogued below.
 * **`getCharHeight(character)`**
 * **`getCharWhitespace(character)`**
 
+## Text Manipulation
+
+* **`setCharacterSpacing(n)`**
+<p align="center">
+  <a href="https://github.com/micycle1/">
+  <img src="resources/char_spacing2.gif" alt="example"/></a>
+</p>
+
+* **`setCharacterRotation(charIndex, angle)`**
+
+  > TODO image
+
+* **`setShearX(maxShear)`**
+
+  > TODO image
+
+## Rendering
+
+* **`shape(myPText, x, y)`**
+  
+  Use Processing's `shape()` method to draw the PText like a `PShape` (alignment will be `LEFT`, `BASELINE`). 
+
+* **`draw(x, y, alignX, alignY)`**
+
+  Or call `draw()` on the PText object to specify a specific X and Y alignment (similar to `textAlign()`).
 ## Debug
 
 * **`debug()`**
