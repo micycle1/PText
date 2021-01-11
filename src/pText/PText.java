@@ -2,8 +2,6 @@ package pText;
 
 import static processing.core.PApplet.sin;
 import static processing.core.PApplet.cos;
-import static processing.core.PApplet.abs;
-
 import processing.core.PApplet;
 import processing.core.PFont;
 import processing.core.PGraphics;
@@ -13,8 +11,6 @@ import processing.core.PVector;
 
 import java.text.DecimalFormat;
 import java.util.ArrayList;
-import java.util.Arrays;
-
 import static processing.core.PApplet.round;
 
 /**
@@ -232,7 +228,7 @@ public class PText extends PShape {
 		perCharacterCenterPoint = new PVector[text.length]; // calculate during iteration // TODO change when scaled
 
 		for (int i = 0; i < text.length; i++) {
-			Character c = text[i];
+			char c = text[i];
 			PShape character = font.getShape(c);
 
 			/**
@@ -297,6 +293,8 @@ public class PText extends PShape {
 	 */
 	public void setShearX(float shear) {
 
+		// TODO rotate char back to 0, perform shear, then rotate back
+
 		/**
 		 * The built-in shearX() affects transformation matrix only, not the location of
 		 * a PShape's vertices TODO variable baseline
@@ -316,12 +314,12 @@ public class PText extends PShape {
 					PVector vertex = child.getVertex(i);
 					vertex.x += PApplet.map(vertex.y, 0, getTextAscent(), 0, logicalShear);
 					child.setVertex(i, vertex); // need to call setVertex() to apply change
-
-//					vertex.y += PApplet.map(vertex.x, 0, getTextWidth(), -logicalShear, logicalShear);
-//					child.setVertex(i, vertex); // need to call setVertex() to apply change
 				}
 			}
 		}
+
+//		vertex.y += PApplet.map(vertex.x, 0, getTextWidth(), -logicalShear, logicalShear);
+//		child.setVertex(i, vertex); // need to call setVertex() to apply change
 
 		shearX = shear;
 
@@ -405,6 +403,7 @@ public class PText extends PShape {
 		p.pushStyle(); // save existing style
 
 		p.noFill();
+		p.noStroke();
 
 		/**
 		 * Draw string bounding box (excludes whitespace)
@@ -412,7 +411,9 @@ public class PText extends PShape {
 		if (bounds) {
 			p.stroke(0);
 			p.strokeWeight(4);
-			p.rect(posX, posY + getTextDescent(), getTextWidth(), -getTextHeight());
+//			p.rect(posX, posY + getTextDescent(), getTextWidth(), -getTextHeight());
+			p.rect(posX + getMinX(getChild(0)), posY + getMaxY(this), getMaxX(this) - getMinX(getChild(0)),
+					-getHeight(this));
 		}
 
 		/**
@@ -425,7 +426,7 @@ public class PText extends PShape {
 
 			if (shearX == 0) {
 				for (int i = 0; i < text.length(); i++) {
-					final Character c = text.charAt(i);
+					final char c = text.charAt(i);
 					final float charXPos = translationX + posX - getWhiteSpaceLeft() + perCharacterSpacing[i];
 //					p.pushMatrix();
 //					p.translate(perCharacterCenterPoint[i].x, perCharacterCenterPoint[i].y + posY);
@@ -438,10 +439,20 @@ public class PText extends PShape {
 				}
 			} else { // TODO
 				for (int i = 0; i < text.length(); i++) {
-					float w = getWidth(getChild(i)) + getCharWhiteSpace(text.charAt(i));
-					Character c = text.charAt(i);
-					float charXPos = translationX + posX - getWhiteSpaceLeft() + perCharacterSpacing[i];
-					p.rect(charXPos, posY + charDescent.get(i) * scaleY, w, -getCharHeight(c));
+
+					if (i % 2 == 0) { // alternate stoke color to see overlap better
+						p.stroke(90, 230, 111);
+					} else {
+						p.stroke(230, 164, 90);
+					}
+
+					float w = getWidth(getChild(i));// + getCharWhiteSpace(text.charAt(i));
+					float h = getHeight(getChild(i));
+					float xOff = getMinX(getChild(i));
+					float yOff = getMaxY(getChild(i));
+					char c = text.charAt(i);
+					float charXPos = posX - getWhiteSpaceLeft() + perCharacterSpacing[i];
+					p.rect(charXPos + xOff + getWhiteSpaceLeft(), posY + yOff, w, -h);
 					translationX += w;
 				}
 			}
@@ -495,8 +506,9 @@ public class PText extends PShape {
 			p.strokeWeight(4);
 			p.ellipseMode(CENTER); // draw exactly on point
 			for (int j = 0; j < getChildren().length; j++) {
-				PShape child = getChildren()[j];
+				PShape child = getChild(j);
 				for (int i = 0; i < child.getVertexCount(); i++) {
+					p.stroke(child.getVertexCode(i) * 50);
 					p.point((child.getVertex(i).x) * scaleX + posX + perCharacterSpacing[j],
 							child.getVertex(i).y * scaleY + posY);
 				}
@@ -547,11 +559,11 @@ public class PText extends PShape {
 	 * @param c
 	 * @return
 	 */
-	public float getCharWidth(Character c) {
+	public float getCharWidth(char c) {
 		return font.width(c) * font.getSize() * scaleX;
 	}
 
-	public float getCharHeight(Character c) {
+	public float getCharHeight(char c) {
 		return font.getGlyph(c).height * scaleY;
 	}
 
@@ -564,7 +576,7 @@ public class PText extends PShape {
 	 * @param c
 	 * @return
 	 */
-	public float getCharWhiteSpace(Character c) {
+	public float getCharWhiteSpace(char c) {
 		return getCharWidth(c) - (font.getGlyph(c).width * scaleX);
 	}
 
