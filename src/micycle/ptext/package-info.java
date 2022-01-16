@@ -3,4 +3,4 @@
  * providing some much needed functionality when working with text in
  * Processing.
  */
-package pText;
+package micycle.ptext;

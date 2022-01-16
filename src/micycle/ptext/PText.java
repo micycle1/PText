@@ -1,7 +1,9 @@
-package pText;
+package micycle.ptext;
 
 import static processing.core.PApplet.sin;
 import static processing.core.PApplet.cos;
+import static processing.core.PApplet.round;
+
 import processing.core.PApplet;
 import processing.core.PFont;
 import processing.core.PGraphics;
@@ -11,13 +13,12 @@ import processing.core.PVector;
 
 import java.text.DecimalFormat;
 import java.util.ArrayList;
-import static processing.core.PApplet.round;
 
 /**
  * Vectorised text for Processing. A middleman between PFonts and PShapes. Eases
  * working with text.
  * 
- * @author micycle1
+ * @author Michael Carleton
  *
  */
 public class PText extends PShape {
@@ -397,8 +398,8 @@ public class PText extends PShape {
 	 * @param charSpacing
 	 * @param info
 	 */
-	public void debug(float posX, float posY, boolean bounds, boolean charBounds, boolean baseline, boolean vertices,
-			boolean charSpacing, boolean info) {
+	public void debug(float posX, float posY, boolean bounds, boolean charBounds, boolean baseline, boolean vertices, boolean charSpacing,
+			boolean info) {
 
 		p.pushStyle(); // save existing style
 
@@ -412,8 +413,7 @@ public class PText extends PShape {
 			p.stroke(0);
 			p.strokeWeight(4);
 //			p.rect(posX, posY + getTextDescent(), getTextWidth(), -getTextHeight());
-			p.rect(posX + getMinX(getChild(0)), posY + getMaxY(this), getMaxX(this) - getMinX(getChild(0)),
-					-getHeight(this));
+			p.rect(posX + getMinX(getChild(0)), posY + getMaxY(this), getMaxX(this) - getMinX(getChild(0)), -getHeight(this));
 		}
 
 		/**
@@ -481,8 +481,8 @@ public class PText extends PShape {
 																								// bounding
 																								// box (right side)
 			for (int i = 1; i < text.length(); i++) {
-				p.line(spacingOffset + perCharacterSpacing[i - 1], posY - getTextAscent() / 2,
-						spacingOffset + perCharacterSpacing[i], posY - getTextAscent() / 2);
+				p.line(spacingOffset + perCharacterSpacing[i - 1], posY - getTextAscent() / 2, spacingOffset + perCharacterSpacing[i],
+						posY - getTextAscent() / 2);
 				spacingOffset += getCharWidth(text.charAt(i));
 			}
 			/**
@@ -509,8 +509,7 @@ public class PText extends PShape {
 				PShape child = getChild(j);
 				for (int i = 0; i < child.getVertexCount(); i++) {
 					p.stroke(child.getVertexCode(i) * 50);
-					p.point((child.getVertex(i).x) * scaleX + posX + perCharacterSpacing[j],
-							child.getVertex(i).y * scaleY + posY);
+					p.point((child.getVertex(i).x) * scaleX + posX + perCharacterSpacing[j], child.getVertex(i).y * scaleY + posY);
 				}
 			}
 		}
@@ -523,8 +522,8 @@ public class PText extends PShape {
 			p.fill(0);
 			p.textAlign(LEFT);
 			p.text(String.format("Width: %s Height: %s Ascent: %s Descent: %s Char Spacing: %s", round(getTextWidth()),
-					round(getTextHeight()), format(getTextAscent()), format(getTextDescent()),
-					format(characterSpacing)), posX, posY - getTextAscent() - 14);
+					round(getTextHeight()), format(getTextAscent()), format(getTextDescent()), format(characterSpacing)), posX,
+					posY - getTextAscent() - 14);
 		}
 		p.popStyle(); // return saved style
 
@@ -737,32 +736,32 @@ public class PText extends PShape {
 		final float offsetY;
 
 		switch (alignX) {
-			case RIGHT:
+			case RIGHT :
 				offsetX = -getTextWidth();
 				break;
-			case CENTER:
+			case CENTER :
 				offsetX = -getTextWidth() / 2;
 				break;
-			default:
+			default :
 				System.err.println("Unrecognised X alignment. Defaulting to LEFT.");
-			case LEFT:
+			case LEFT :
 				offsetX = 0;
 				break;
 		}
 
 		switch (alignY) {
-			case TOP:
+			case TOP :
 				offsetY = getTextAscent();
 				break;
-			case CENTER:
+			case CENTER :
 				offsetY = -getTextDescent() + getTextHeight() / 2;
 				break;
-			case BOTTOM:
+			case BOTTOM :
 				offsetY = -getTextDescent();
 				break;
-			default:
+			default :
 				System.err.println("Unrecognised X alignment. Defaulting to BASELINE.");
-			case BASELINE:
+			case BASELINE :
 				offsetY = 0;
 		}
 
