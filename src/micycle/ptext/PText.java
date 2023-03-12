@@ -250,7 +250,6 @@ public class PText extends PShape {
 			charDescent.add(getMaxY(character)); // store this character's descent value
 
 			perCharacterCenterPoint[i] = getCenterPoint(character);
-			p.println(perCharacterCenterPoint[i]);
 		}
 
 		width = translationX - getCharWhiteSpace(text[text.length - 1]) / 2f; // take away whitespace of last char
